@@ -1,0 +1,41 @@
+{
+    "manifest_version": 3,
+    "name": "arc",
+    "version": "1.0.0",
+    "permissions": [
+        "bookmarks",
+        "history",
+        "tabs",
+        "sessions",
+        "storage",
+        "scripting"
+    ],
+    "host_permissions": [
+        "<all_urls>"
+    ],
+    "background": {
+        "service_worker": "background.js",
+        "type": "module"
+    },
+    "content_scripts": [
+        {
+            "matches": [
+                "<all_urls>"
+            ],
+            "js": [
+                "content.js"
+            ],
+            "run_at": "document_idle"
+        }
+    ],
+    "commands": {
+        "toggle-palette": {
+            "suggested_key": {
+                "default": "Ctrl+Shift+Space",
+                "mac": "Command+Shift+Space"
+            },
+            "description": "Toggle Command Palette"
+        }
+    },
+    "action": {}
+}
