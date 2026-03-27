@@ -4,10 +4,10 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
-    "lint": "eslint .",
-    "preview": "vite preview"
+    "dev": "npm run build:bg -- --watch & npm run build:content -- --watch",
+    "build": "npm run build:bg && npm run build:content",
+    "build:bg": "vite build --config vite.config.ts",
+    "build:content": "vite build --config vite.content.config.ts"
   },
   "dependencies": {
     "react": "^19.2.4",
