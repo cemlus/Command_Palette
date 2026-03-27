@@ -1,101 +1,87 @@
-# Arc
+# Command Palette
 
-Arc is a Chrome Extension command palette that lets you quickly search and open:
+Command Palette is a Chrome Extension that opens a quick launcher overlay in the current tab and lets you search across browser data in one place.
 
-- Open tabs
-- Bookmarks
-- Browsing history
-- Recently closed tabs
+## What It Does
 
-The palette opens as an overlay and is designed for keyboard-first navigation.
+- Searches open tabs, bookmarks, history, and recently closed tabs
+- Opens results with keyboard-first navigation
+- Focuses existing tabs or restores closed tabs when applicable
+- Falls back to opening URLs in a new tab for bookmark/history results
 
-## Features
+## Keyboard Shortcut
 
-- **Global shortcut**: `Ctrl+Shift+K` (`Command+Shift+K` on macOS)
-- **Unified search** across tabs, bookmarks, history, and recently closed sessions
-- **Fast keyboard flow**:
-  - `↑` / `↓` to move
-  - `Enter` to open
-  - `Esc` to close
-- **Result-specific behavior**:
-  - Existing tab results focus the tab and its window
-  - Closed tab results restore the session
-  - Bookmark/history results open in a new tab
+- `Ctrl+Shift+K` (Windows/Linux)
+- `Command+Shift+K` (macOS)
+
+The extension also supports clicking the toolbar icon to toggle the palette.
 
 ## Tech Stack
 
 - React 19 + TypeScript
-- Vite
-- Chrome Extensions Manifest V3 (service worker background)
+- Vite (separate builds for background and content script)
+- Chrome Extension Manifest V3
 
 ## Project Structure
 
 ```text
+public/
+  manifest.json            # extension manifest copied into dist
 src/
-  background/   # command + search/open logic
-  content/      # content script entry (currently placeholder)
-  palette/      # React UI for the command palette
-  types/        # shared extension types
-manifest.json   # extension manifest
+  background/index.ts      # command handlers + search/open logic
+  content/index.tsx        # content script mount/toggle + message handling
+  palette/                 # React command palette UI
+  types/                   # shared types
+vite.config.ts             # background build config
+vite.content.config.ts     # content script build config
 ```
 
-## Getting Started
-
-### Prerequisites
-
-- Node.js 18+ (recommended: latest LTS)
-- npm
-- Chrome (or Chromium-based browser with extension dev mode)
-
-### Install
+## Installation
 
 ```bash
 npm install
 ```
 
-### Development
+## Development
 
 ```bash
 npm run dev
 ```
 
-Starts Vite dev server for local iteration.
+Runs both background and content script builds in watch mode.
 
-### Build
+## Production Build
 
 ```bash
 npm run build
 ```
 
-This runs TypeScript build checks and produces a production bundle in `dist/`.
+Build output is generated in `dist/`.
 
-## Load the Extension in Chrome
+## Load in Chrome
 
-1. Run `npm run build`.
+1. Run `npm run build` (or keep `npm run dev` running).
 2. Open `chrome://extensions`.
-3. Enable **Developer mode**.
+3. Turn on **Developer mode**.
 4. Click **Load unpacked**.
-5. Select this project's `dist/` directory.
-6. Use the shortcut (`Ctrl+Shift+K` / `Command+Shift+K`) to toggle the palette.
+5. Select the project's `dist/` directory.
+6. Use `Ctrl+Shift+K` / `Command+Shift+K` to toggle the palette.
 
-## Scripts
+## NPM Scripts
 
-- `npm run dev` - start Vite dev server
-- `npm run build` - type-check and build production assets
-- `npm run lint` - run ESLint
-- `npm run preview` - preview the Vite production build
+- `npm run dev` - watch build for `background` and `content`
+- `npm run build` - build both targets once
+- `npm run build:bg` - build only background script
+- `npm run build:content` - build only content script
 
-## Permissions Used
+## Permissions
 
-From `manifest.json`:
+Defined in `public/manifest.json`:
 
-- `tabs` - list and focus tabs
+- `tabs` - enumerate/focus tabs
 - `bookmarks` - search bookmarks
-- `history` - search browsing history
+- `history` - search browser history
 - `sessions` - restore recently closed tabs
-- `storage` - reserved for persisted extension state
-
-## Notes
-
-- The current `content` entrypoint is a placeholder; palette injection/toggling should be wired there as development continues.
-- TypeScript strict settings are enabled for the app source.
+- `scripting` - inject content script when needed
+- `storage` - reserved for extension state
+- `host_permissions: <all_urls>` - run content script on pages
