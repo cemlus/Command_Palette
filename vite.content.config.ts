@@ -6,15 +6,16 @@ export default defineConfig({
   plugins: [react()],
   build: {
     outDir: "dist",
+    emptyOutDir: false,
     rollupOptions: {
       input: {
-        background: resolve(__dirname, "src/background/index.ts"),
+        content: resolve(__dirname, "src/content/index.tsx"),
       },
       output: {
         entryFileNames: "[name].js",
-        chunkFileNames: "[name].js",
-        assetFileNames: "[name].[ext]",
-        format: "es",
+        format: "iife",
+        name: "cmdPalette",
+        inlineDynamicImports: true,
       },
     },
   },
