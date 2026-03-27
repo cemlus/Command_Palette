@@ -1,38 +1,66 @@
 import type { PaletteResult } from "../types";
-// @ts-ignore
-chrome.commands.onCommand.addListener((command) => {
-    if (command !== "toggle-palette") return;
-    
-    // @ts-ignore
-    chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
-        if (!tab?.id) return;
-        
-        // Ping first — if content script is alive, toggle it
-        // @ts-ignore
-        chrome.tabs.sendMessage(tab.id, { type: "PING" }, (res) => {
-        // @ts-ignore
-        if (chrome.runtime.lastError || !res?.alive) {
-            // Content script not ready — inject it programmatically then toggle
-            // @ts-ignore
-            chrome.scripting.executeScript(
-                { target: { tabId: tab.id! }, files: ["content.js"] },
-                () => {
-              // @ts-ignore
-              if (chrome.runtime.lastError) return;
-              setTimeout(() => {
-                // @ts-ignore
-              chrome.tabs.sendMessage(tab.id!, { type: "TOGGLE_PALETTE" });
-            }, 100);
+
+function isRestrictedUrl(url: string | undefined): boolean {
+  if (!url) return true;
+  return (
+    url.startsWith("chrome://") ||
+    url.startsWith("chrome-extension://") ||
+    url.startsWith("devtools://") ||
+    url.startsWith("about:") ||
+    url.startsWith("edge://")
+  );
+}
+
+function toggleOnTab(tabId: number) {
+  chrome.tabs.get(tabId, (tab) => {
+    if (chrome.runtime.lastError || isRestrictedUrl(tab.url)) {
+      console.warn("[CMD] Restricted tab — opening palette in a new tab instead");
+      chrome.tabs.create({ url: "https://www.google.com" }, (newTab) => {
+        if (newTab.id) {
+          setTimeout(() => chrome.tabs.sendMessage(newTab.id!, { type: "TOGGLE_PALETTE" }), 800);
+        }
+      });
+      return;
+    }
+
+    chrome.tabs.sendMessage(tabId, { type: "PING" }, (res) => {
+      if (chrome.runtime.lastError || !res?.alive) {
+        chrome.scripting.executeScript(
+          { target: { tabId }, files: ["content.js"] },
+          () => {
+            if (chrome.runtime.lastError) {
+              console.error("[CMD] inject failed:", chrome.runtime.lastError.message);
+              return;
+            }
+            setTimeout(() => chrome.tabs.sendMessage(tabId, { type: "TOGGLE_PALETTE" }), 150);
           }
         );
       } else {
-        // @ts-ignore
-        chrome.tabs.sendMessage(tab.id!, { type: "TOGGLE_PALETTE" });
+        chrome.tabs.sendMessage(tabId, { type: "TOGGLE_PALETTE" });
       }
     });
   });
+}
+
+function getActiveTab(cb: (tabId: number) => void) {
+  chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
+    if (tab?.id) cb(tab.id);
+    else console.error("[CMD] No active tab found");
+  });
+}
+
+// Keyboard shortcut
+chrome.commands.onCommand.addListener((command) => {
+  console.log("[CMD] command fired:", command);
+  if (command === "toggle-palette") getActiveTab(toggleOnTab);
 });
-// @ts-ignore
+
+// Icon click
+chrome.action.onClicked.addListener((tab) => {
+  console.log("[CMD] action clicked, tab:", tab.id);
+  if (tab.id) toggleOnTab(tab.id);
+});
+
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg.type === "SEARCH") {
     handleSearch(msg.query).then(sendResponse);
@@ -47,19 +75,15 @@ async function handleSearch(query: string): Promise<PaletteResult[]> {
   const q = query.toLowerCase();
 
   const [tabs, bookmarks, historyItems, sessions] = await Promise.all([
-    // @ts-ignore
     chrome.tabs.query({}),
-    // @ts-ignore
     query ? chrome.bookmarks.search(query) : chrome.bookmarks.getRecent(10),
-    // @ts-ignore
     chrome.history.search({ text: query, maxResults: 10, startTime: 0 }),
-    // @ts-ignore
     chrome.sessions.getRecentlyClosed({ maxResults: 10 }),
   ]);
 
   const tabResults: PaletteResult[] = tabs
-    .filter((t: any) => matches(q, t.title, t.url))
-    .map((t: any) => ({
+    .filter((t) => matches(q, t.title, t.url))
+    .map((t) => ({
       id: `tab-${t.id}`,
       type: "tab",
       title: t.title || "Untitled",
@@ -69,9 +93,9 @@ async function handleSearch(query: string): Promise<PaletteResult[]> {
     }));
 
   const bookmarkResults: PaletteResult[] = bookmarks
-    .filter((b: any) => b.url && matches(q, b.title, b.url))
+    .filter((b) => b.url && matches(q, b.title, b.url))
     .slice(0, 10)
-    .map((b: any) => ({
+    .map((b) => ({
       id: `bookmark-${b.id}`,
       type: "bookmark",
       title: b.title || "Untitled",
@@ -79,8 +103,8 @@ async function handleSearch(query: string): Promise<PaletteResult[]> {
     }));
 
   const historyResults: PaletteResult[] = historyItems
-    .filter((h: any) => matches(q, h.title, h.url))
-    .map((h: any) => ({
+    .filter((h) => matches(q, h.title, h.url))
+    .map((h) => ({
       id: `history-${h.id}`,
       type: "history",
       title: h.title || "Untitled",
@@ -88,7 +112,7 @@ async function handleSearch(query: string): Promise<PaletteResult[]> {
     }));
 
   const closedResults: PaletteResult[] = sessions
-    .flatMap((s: any) => {
+    .flatMap((s) => {
       const entry = s.tab ?? s.window?.tabs?.[0];
       if (!entry) return [];
       return [{
@@ -100,7 +124,7 @@ async function handleSearch(query: string): Promise<PaletteResult[]> {
         sessionId: entry.sessionId,
       }];
     })
-    .filter((r: any) => matches(q, r.title, r.url));
+    .filter((r) => matches(q, r.title, r.url));
 
   return [...tabResults, ...bookmarkResults, ...historyResults, ...closedResults].slice(0, 30);
 }
@@ -112,17 +136,13 @@ function matches(q: string, ...fields: (string | undefined)[]): boolean {
 
 function openResult(result: PaletteResult) {
   if (result.type === "tab" && result.tabId != null) {
-    // @ts-ignore
     chrome.tabs.update(result.tabId, { active: true });
-    // @ts-ignore
     chrome.tabs.get(result.tabId, (t) => chrome.windows.update(t.windowId, { focused: true }));
     return;
-}
-if (result.type === "closed-tab" && result.sessionId) {
-      // @ts-ignore
-      chrome.sessions.restore(result.sessionId);
-      return;
-    }
-    // @ts-ignore
+  }
+  if (result.type === "closed-tab" && result.sessionId) {
+    chrome.sessions.restore(result.sessionId);
+    return;
+  }
   chrome.tabs.create({ url: result.url });
 }

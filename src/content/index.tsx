@@ -25,7 +25,27 @@ if (!(window as any).__cmdPaletteLoaded) {
       <App visible={visible} onClose={() => { visible = false; render(); }} />
     );
   }
-// @ts-ignore
+
+  // ✅ ADD IT HERE
+  window.addEventListener(
+    "keydown",
+    (e) => {
+      const isMac = navigator.platform.includes("Mac");
+      const trigger = isMac
+        ? e.metaKey && e.shiftKey && e.key.toLowerCase() === "k"
+        : e.ctrlKey && e.shiftKey && e.key.toLowerCase() === "k";
+
+      if (trigger) {
+        e.preventDefault();
+        e.stopPropagation();
+        visible = !visible;
+        render();
+      }
+    },
+    true // capture phase
+  );
+
+  // @ts-ignore
   chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     if (msg.type === "PING") {
       sendResponse({ alive: true });
